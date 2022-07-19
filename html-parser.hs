@@ -3,18 +3,10 @@ import Data.Char
 
 import Text.ParserCombinators.ReadP
 
--- data HtmlNode = HtmlNode {
---     content :: String,
---     tag :: String
--- } deriving Show
-
 data HtmlNode =
     HtmlContent String |
     HtmlTag String [HtmlNode]
     deriving Show
-
-parseContent :: ReadP String
-parseContent = many get
 
 openTag :: ReadP String
 openTag = do
@@ -23,7 +15,7 @@ openTag = do
     char '>'
     return tag
 
-closeTag :: String -> (ReadP String)
+closeTag :: String -> ReadP String
 closeTag tag = do
     char '<'
     char '/'
@@ -31,16 +23,22 @@ closeTag tag = do
     char '>'
     return tag
 
-parseNode :: ReadP HtmlNode
-parseNode = do
-    tag <- openTag
-    content <- parseContent 
-    closeTag tag
-    return $ HtmlTag tag [HtmlContent content]
+parseContent :: ReadP HtmlNode
+parseContent = do
+    content <- many1 $ satisfy (\ch -> all (ch/=) ['<', '>'])
+    return $ HtmlContent content
 
+parseTag :: ReadP HtmlNode
+parseTag = do
+    tag <- openTag
+    children <- parseNode
+    closeTag tag
+    return $ HtmlTag tag children
+
+parseNode :: ReadP [HtmlNode]
+parseNode = option [] $ fmap (:[]) $ choice $ parseContent:parseTag:[] 
 
 main :: IO ()
-main = do {
+main = do
     str <- readFile "./bookmarks.html";
-    print $ readP_to_S parseNode str 
-}
+    print $ readP_to_S parseTag str 
